@@ -330,8 +330,8 @@ var (
 	contentStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#7B61FF")).
-		// Padding(1, 2).
-		MarginTop(1)
+			Padding(1, 2).
+			MarginTop(1)
 
 	// No entry message
 	emptyStyle = lipgloss.NewStyle().
