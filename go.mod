@@ -1,4 +1,4 @@
-module yousuf.xyz/cal
+module yousuf.xyz/journal
 
 go 1.25.5
 
