@@ -128,6 +128,7 @@ func InitialModel() model {
 	inputfield := textarea.New()
 	inputfield.Focus()
 	inputfield.Placeholder = "how's your day going"
+	inputfield.ShowLineNumbers = false
 
 	monthOrder := []string{"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
 
@@ -149,9 +150,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// when text editor is open all keys should be directed there
 	if m.showinputfield {
-		var cmd tea.Cmd
-		m.inputfield, cmd = m.inputfield.Update(msg)
-
+		// Handle resize and special keys before passing to textarea
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
@@ -173,8 +172,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				return m, nil
 			}
+		case tea.WindowSizeMsg:
+			// Set dimensions directly and also pass to textarea so it reflows correctly
+			m.inputfield.SetWidth(msg.Width)
+			m.inputfield.SetHeight(msg.Height - 5)
 		}
 
+		// Pass all other messages (including keypresses) to the textarea
+		var cmd tea.Cmd
+		m.inputfield, cmd = m.inputfield.Update(msg)
 		return m, cmd
 	}
 
@@ -299,8 +305,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case tea.WindowSizeMsg:
-		m.inputfield.SetHeight(msg.Height - 2)
-		m.inputfield.SetWidth(msg.Width)
+		m.inputfield.SetHeight(msg.Height - 5)
+		m.inputfield.SetWidth(msg.Width - 10)
 		log.Println("Height: " + strconv.Itoa(msg.Height) + "\tWidth: " + strconv.Itoa(msg.Width))
 
 	}
@@ -328,7 +334,7 @@ var (
 
 	// Journal content
 	contentStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			// Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#7B61FF")).
 			Padding(1, 2).
 			MarginTop(1)
@@ -347,35 +353,35 @@ func (m model) View() string {
 		return fmt.Sprintf("%s\n\n ", m.inputfield.View())
 	}
 
-	var output strings.Builder
+	var calendarContent strings.Builder
 
 	// Styled header
-	output.WriteString(headerStyle.Render("Day: "+strconv.Itoa(m.activeDate)) + "\n")
-	output.WriteString(headerStyle.Render("Month: "+m.activeMonth) + "\n\n")
+	calendarContent.WriteString(headerStyle.Render("Day: "+strconv.Itoa(m.activeDate)) + "\n")
+	calendarContent.WriteString(headerStyle.Render("Month: "+m.activeMonth) + "\n\n")
 
 	counter := 0
 	for _, v := range m.dates[m.activeMonth] {
 		s_v, _ := strconv.Atoi(v)
 		if s_v == m.activeDate {
-			output.WriteString(activeDateStyle.Render(fmt.Sprintf("%2s", v)))
+			calendarContent.WriteString(activeDateStyle.Render(fmt.Sprintf("%2s", v)))
 		} else {
-			output.WriteString(normalDateStyle.Render(fmt.Sprintf("%2s", v)))
+			calendarContent.WriteString(normalDateStyle.Render(fmt.Sprintf("%2s", v)))
 		}
 		counter++
 		if counter == 7 {
 			counter = 0
-			output.WriteString("\n")
+			calendarContent.WriteString("\n")
 		}
 	}
 
-	// Styled content area
+	var journalContent string
 	if err != nil {
-		output.WriteString("\n" + emptyStyle.Render("no entry"))
+		journalContent = emptyStyle.Render("no entry")
 	} else {
-		output.WriteString("\n" + contentStyle.Render(string(content)))
+		journalContent = "\n" + contentStyle.Render(string(content))
 	}
 
-	return output.String()
+	return lipgloss.JoinHorizontal(lipgloss.Top, calendarContent.String(), journalContent)
 }
 
 func main() {
@@ -392,7 +398,7 @@ func main() {
 	log.Println("Application started at ", time.Now())
 
 	// new bubbletea program
-	p := tea.NewProgram(InitialModel())
+	p := tea.NewProgram(InitialModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		log.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
