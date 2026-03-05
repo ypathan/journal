@@ -378,7 +378,15 @@ func (m model) View() string {
 	if err != nil {
 		journalContent = emptyStyle.Render("no entry")
 	} else {
-		journalContent = "\n" + contentStyle.Render(string(content))
+		var preview string
+		if len(string(content)) > 1000 {
+			preview = string(content)[:1000] + lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FF75B5")).
+				Render("\n\npress a to view more....")
+		}else{
+			preview = string(content)
+		}
+		journalContent = "\n" + contentStyle.Render(preview)
 	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, calendarContent.String(), journalContent)
