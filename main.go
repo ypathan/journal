@@ -322,9 +322,7 @@ var (
 
 	// Active/selected date
 	activeDateStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(lipgloss.Color("#7B61FF")).
+			Background(lipgloss.Color("#FF75B5")).
 			Padding(0, 1)
 
 	// Normal date
@@ -334,7 +332,6 @@ var (
 
 	// Journal content
 	contentStyle = lipgloss.NewStyle().
-			// Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#7B61FF")).
 			Padding(1, 2).
 			MarginTop(1)
@@ -346,6 +343,26 @@ var (
 )
 
 func (m model) View() string {
+
+	// get all days with entries in this month
+	monthpath := "/Users/myousuf/journal/" + m.activeMonth
+	files, err := os.ReadDir(monthpath)
+	if err != nil {
+		log.Println("error", err.Error())
+	}
+
+	log.Println("monthpath :", monthpath)
+
+	var allentries []string
+
+	for _, file := range files {
+		name := strings.Replace(file.Name(), ".txt", "", 1)
+		allentries = append(allentries, name)
+	}
+
+	log.Println("allentries: ", allentries)
+
+	// read the file
 	filePath := getfileinfo(m.activeMonth, m.activeDate)
 	content, err := os.ReadFile(filePath)
 
@@ -362,11 +379,22 @@ func (m model) View() string {
 	counter := 0
 	for _, v := range m.dates[m.activeMonth] {
 		s_v, _ := strconv.Atoi(v)
-		if s_v == m.activeDate {
-			calendarContent.WriteString(activeDateStyle.Render(fmt.Sprintf("%2s", v)))
+
+		var formatted string
+		if slices.Contains(allentries, v) {
+			formatted = fmt.Sprintf("%3s", "#"+v)
 		} else {
-			calendarContent.WriteString(normalDateStyle.Render(fmt.Sprintf("%2s", v)))
+			formatted = fmt.Sprintf("%3s", v)
 		}
+
+		if s_v == m.activeDate {
+			formatted = activeDateStyle.Render(formatted)
+		} else {
+			formatted =  normalDateStyle.Render(formatted)
+		}
+
+		calendarContent.WriteString(formatted)
+
 		counter++
 		if counter == 7 {
 			counter = 0
@@ -383,7 +411,7 @@ func (m model) View() string {
 			preview = string(content)[:1000] + lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#FF75B5")).
 				Render("\n\npress a to view more....")
-		}else{
+		} else {
 			preview = string(content)
 		}
 		journalContent = "\n" + contentStyle.Render(preview)
