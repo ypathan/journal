@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -26,23 +27,34 @@ type model struct {
 
 type Change int
 
+var env string
+
 const (
 	Decrease Change = 0
 	Increase Change = 1
 )
 
 func getfileinfo(month string, day int) string {
-	// user home directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-
 	// filename
 	filename := strconv.Itoa(day) + ".txt"
 
-	// full file path
-	return filepath.Join(home, "journal", month, filename)
+	switch env {
+	case "prod":
+		home, err := os.UserHomeDir()
+		if err != nil {
+			panic(err)
+		}
+		// full file path
+		return filepath.Join(home, ".journal", month, filename)
+	case "dev":
+		pwd, err := os.Getwd()
+		if err != nil {
+			panic(err)
+		}
+		return filepath.Join(pwd, ".journal", month, filename)
+	default:
+		return ""
+	}
 }
 
 func checkMonthChange(allDaysInMonth []string, day int, change Change) bool {
@@ -67,6 +79,23 @@ func checkMonthChange(allDaysInMonth []string, day int, change Change) bool {
 	log.Println("changeMonth : ", changeMonth, " idx: ", idx)
 
 	return changeMonth
+}
+
+func checkDirExists(dirPath string) bool {
+
+	// check if path exists
+	_, err := os.Stat(dirPath)
+	if err != nil {
+		err = os.Mkdir(dirPath, 0755)
+		if err != nil {
+			log.Println("error creating directory")
+			return false
+		}
+		return true
+	}
+
+	//return true for no error and false for errors
+	return true
 }
 
 func InitialModel() model {
@@ -167,6 +196,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				os.WriteFile(filePath, []byte(content), 0644)
 
+				log.Println("created new file at: ", filePath)
+
 				// reset text area
 				m.inputfield.SetValue("")
 
@@ -246,6 +277,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if shouldChangeMonth && m.activeMonth != "January" {
 				idx := slices.Index(m.monthOrder, m.activeMonth)
 				m.activeMonth = m.monthOrder[idx-1]
+
 				// date should be last day of month
 				daysInMonth := m.dates[m.activeMonth]
 				lastDay := daysInMonth[len(daysInMonth)-1]
@@ -344,23 +376,46 @@ var (
 
 func (m model) View() string {
 
-	// get all days with entries in this month
-	homedir, err  := os.UserHomeDir()
-	if err != nil {
-		log.Println("error finding home dir", err.Error() )
+	var homeDir string
+	var err error
+	var monthPath string
+
+	switch env {
+	case "prod":
+		homeDir, err = os.UserHomeDir()
+		if err != nil {
+			log.Println("error finding home dir", err.Error())
+		}
+		dirPath := homeDir + "/.journal"
+
+		if checkDirExists(dirPath) {
+			monthPath = dirPath + "/" + m.activeMonth
+		} else {
+			panic("check dir : " + dirPath)
+		}
+
+	case "dev":
+		workingdir, err := os.Getwd()
+		if err != nil {
+			log.Println("error finding home dir", err.Error())
+		}
+		dirPath := workingdir + "/.journal"
+		if checkDirExists(dirPath) {
+			monthPath = dirPath + "/" + m.activeMonth
+		} else {
+			panic("check dir " + dirPath)
+		}
+		monthPath = workingdir + "/.journal/" + m.activeMonth
 	}
 
-	monthpath := homedir + "/journal/" + m.activeMonth
-
-	files, err := os.ReadDir(monthpath)
+	// reading files
+	files, err := os.ReadDir(monthPath)
 	if err != nil {
-		log.Println("error", err.Error())
+		log.Println("error reading files ", err.Error())
 	}
 
-	log.Println("monthpath :", monthpath)
-
+	// processing filenames
 	var allentries []string
-
 	for _, file := range files {
 		name := strings.Replace(file.Name(), ".txt", "", 1)
 		allentries = append(allentries, name)
@@ -368,7 +423,7 @@ func (m model) View() string {
 
 	log.Println("allentries: ", allentries)
 
-	// read the file
+	// read the file content for the active day
 	filePath := getfileinfo(m.activeMonth, m.activeDate)
 	content, err := os.ReadFile(filePath)
 
@@ -396,7 +451,7 @@ func (m model) View() string {
 		if s_v == m.activeDate {
 			formatted = activeDateStyle.Render(formatted)
 		} else {
-			formatted =  normalDateStyle.Render(formatted)
+			formatted = normalDateStyle.Render(formatted)
 		}
 
 		calendarContent.WriteString(formatted)
@@ -428,6 +483,10 @@ func (m model) View() string {
 
 func main() {
 
+	//parsing flags
+	flag.StringVar(&env, "env", "prod", "passing the environment")
+	flag.Parse()
+
 	file, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal("Failed to open log file:", err)
@@ -437,7 +496,8 @@ func main() {
 	// Set the log output to the file
 	log.SetOutput(file)
 
-	log.Println("Application started at ", time.Now())
+	log.Println("\n\nApplication started at ", time.Now())
+	log.Println("your flag is ", env)
 
 	// new bubbletea program
 	p := tea.NewProgram(InitialModel(), tea.WithAltScreen())
