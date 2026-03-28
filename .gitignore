@@ -1,1 +1,5 @@
 app.log
+.vscode/
+.env
+.idea/
+journal
