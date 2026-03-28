@@ -345,7 +345,13 @@ var (
 func (m model) View() string {
 
 	// get all days with entries in this month
-	monthpath := "/Users/myousuf/journal/" + m.activeMonth
+	homedir, err  := os.UserHomeDir()
+	if err != nil {
+		log.Println("error finding home dir", err.Error() )
+	}
+
+	monthpath := homedir + "/journal/" + m.activeMonth
+
 	files, err := os.ReadDir(monthpath)
 	if err != nil {
 		log.Println("error", err.Error())
